@@ -29,6 +29,13 @@ import ast.nodes.SyntaxNode;
 import ast.nodes.TokenNode;
 import ast.nodes.UnaryOpNode;
 import ast.nodes.ValNode;
+
+// —— ADDED: list-related nodes ——
+import ast.nodes.ListNode;
+import ast.nodes.HeadNode;
+import ast.nodes.TailNode;
+import ast.nodes.LenNode;
+
 import lexer.Lexer;
 import lexer.TokenType;
 import lexer.Token;
@@ -226,7 +233,8 @@ public class MFLParser extends Parser {
     expr = getGoodParse(evalTerm());
 
     op = getCurrToken().getType(); // This should be an operator.
-    while (checkMatch(TokenType.ADD) || checkMatch(TokenType.SUB)) {
+    // —— CHANGED: include list concatenation (++) at this precedence ——
+    while (checkMatch(TokenType.ADD) || checkMatch(TokenType.SUB) || checkMatch(TokenType.CONCAT)) {
       rterm = getGoodParse(evalTerm());
       expr = new BinOpNode(expr, op, rterm, getCurrLine());
       op = getCurrToken().getType(); // Save off the next operator(?).
@@ -285,6 +293,20 @@ public class MFLParser extends Parser {
             return new UnaryOpNode(expr, TokenType.SUB, getCurrLine());
         }
 
+        // —— ADDED: hd/tl/len as prefix operators (tight-binding like unary) ——
+        else if (checkMatch(TokenType.HEAD)) {
+            SyntaxNode inner = getGoodParse(evalFactor());
+            return new HeadNode(inner, getCurrLine());
+        }
+        else if (checkMatch(TokenType.TAIL)) {
+            SyntaxNode inner = getGoodParse(evalFactor());
+            return new TailNode(inner, getCurrLine());
+        }
+        else if (checkMatch(TokenType.LEN)) {
+            SyntaxNode inner = getGoodParse(evalFactor());
+            return new LenNode(inner, getCurrLine());
+        }
+
     
         // Parenthsized expression.
         else if (checkMatch(TokenType.LPAREN)) { 
@@ -294,6 +316,24 @@ public class MFLParser extends Parser {
             // Force the right paren.
             match(TokenType.RPAREN, ")");        
         } 
+        
+        // —— UPDATED: list literal: [ <expr> { <expr> } ] ——
+        else if (checkMatch(TokenType.LBRACKET)) {
+            LinkedList<SyntaxNode> elems = new LinkedList<>();
+
+            // Empty list?
+            if (!tokenIs(TokenType.RBRACKET)) {
+                elems.add(getGoodParse(evalExpr()));
+                // allow multiple expressions without commas
+                while (!tokenIs(TokenType.RBRACKET)) {
+                    elems.add(getGoodParse(evalExpr()));
+                }
+            }
+            match(TokenType.RBRACKET, "]");
+
+            fact = new ListNode(elems, getCurrLine());
+            return fact;
+        }
         
         // Handle the literals.
         else if (tokenIs(TokenType.INT) || tokenIs(TokenType.REAL) ||
