@@ -23,6 +23,7 @@ import ast.typesystem.types.Type;
 import environment.Environment;
 import environment.TypeEnvironment;
 import lexer.TokenType;
+import java.util.LinkedList;
 
 /**
  * This node represents a binary operation.
@@ -74,13 +75,36 @@ public final class BinOpNode extends SyntaxNode
      */
     @Override
     public Object evaluate(Environment env) throws EvaluationException {
-               Object lval;
+        Object lval;
         Object rval;
         boolean useDouble = false;
 
         lval = leftTerm.evaluate(env);
         rval = rightTerm.evaluate(env);
 
+        // ---------- List concatenation (++) ----------
+        if (op == TokenType.CONCAT)
+        {
+            if (!(lval instanceof LinkedList<?>) || !(rval instanceof LinkedList<?>))
+                throw new EvaluationException();
+
+            LinkedList<?> leftList = (LinkedList<?>) lval;
+            LinkedList<?> rightList = (LinkedList<?>) rval;
+
+            // First non-null element class on each side (homogeneity check)
+            Class<?> leftElemType = null;
+            for (Object o : leftList) { if (o != null) { leftElemType = o.getClass(); break; } }
+            Class<?> rightElemType = null;
+            for (Object o : rightList) { if (o != null) { rightElemType = o.getClass(); break; } }
+
+            if (leftElemType != null && rightElemType != null && !leftElemType.equals(rightElemType))
+                throw new EvaluationException();
+
+            LinkedList<Object> out = new LinkedList<>();
+            out.addAll((LinkedList<?>) leftList);
+            out.addAll((LinkedList<?>) rightList);
+            return out;
+        }
 
         // Make sure the type is sound.
         if (!(lval instanceof Integer || lval instanceof Double
