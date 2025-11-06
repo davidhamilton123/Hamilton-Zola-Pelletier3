@@ -175,8 +175,23 @@ public class Token
             return "LET";
         case IN:
             return "IN";
+
+        case HEAD:
+            return "HEAD";
+        case TAIL:
+            return "TAIL";
+        case LEN:
+            return "LEN";
         case EOF:
             return "EOF";
+            case CONCAT:
+                break;
+            case LBRACKET:
+                break;
+            case RBRACKET:
+                break;
+            default:
+                break;
         }
         return "";
     }

@@ -181,8 +181,19 @@ public class Lexer
         // Semi colon.
         case ';':
             return new Token(TokenType.SEMI, ";");
-        case '+':
-            return new Token(TokenType.ADD, "+");
+         case '+':
+            /**  
+             * Could be '+'(addition) or '++' (list concatenation) 
+            */
+            stream.advance();
+            if (stream.getCurrentChar() == '+')
+                return new Token(TokenType.CONCAT, "++");
+            else
+            {
+                // The char we just looked at belongs to the next token
+                stream.skipNextAdvance();
+                return new Token(TokenType.ADD, "+");
+            }
         case '-':
             return new Token(TokenType.SUB, "-");
         case '*':
@@ -230,6 +241,12 @@ public class Lexer
                 stream.skipNextAdvance();
                 return new Token(TokenType.LT, "<");
             }
+
+        case '[':
+            return new Token(TokenType.LBRACKET, "[");
+        case ']':
+            return new Token(TokenType.RBRACKET, "]");
+            
         default:
             return new Token(TokenType.UNKNOWN, String.valueOf(stream.getCurrentChar()));
         }
@@ -250,6 +267,9 @@ public class Lexer
         keywords.put("mod", TokenType.MOD);
         keywords.put("let", TokenType.LET);
         keywords.put("in", TokenType.IN);
+        keywords.put("hd", TokenType.HEAD);
+        keywords.put("tl", TokenType.TAIL);
+        keywords.put("len", TokenType.LEN);
     }
 
      /**

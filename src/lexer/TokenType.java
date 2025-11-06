@@ -162,6 +162,36 @@ public enum TokenType
     IN,
 
     /**
+     * The head function for lists.
+     */
+    HEAD,
+
+    /**
+     * The tail function for lists.
+     */
+    TAIL,
+
+    /**
+     * The length function for lists.
+     */
+    LEN,
+
+
+    /**
+     * Left Bracket
+     */
+    LBRACKET,
+    /**
+     * Right Bracket
+     */
+    RBRACKET,
+    
+    /**
+     * Concatenation operator
+     */
+    CONCAT,
+
+    /**
      * The end of the file token.
      */
     EOF
