@@ -5,7 +5,9 @@ import java.util.LinkedList;
 import ast.EvaluationException;
 import ast.typesystem.TypeException;
 import ast.typesystem.inferencer.Inferencer;
+import ast.typesystem.types.ListType;
 import ast.typesystem.types.Type;
+import ast.typesystem.types.VarType;
 import environment.Environment;
 import environment.TypeEnvironment;
 
@@ -33,13 +35,22 @@ public class HeadNode extends SyntaxNode
         return list.getFirst();
     }
 
-    @Override
-    public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException
-    {
-        // Conservative: return the type of the element expression statically.
-        // Runtime enforces that v is a list and has at least one element.
-        return expr.typeOf(tenv, inferencer);
-    }
+   @Override
+public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException
+{
+    // Determine the type of the expression.
+    Type exprType = expr.typeOf(tenv, inferencer);
+
+    // Create a fresh type variable for the list element.
+    VarType elemType = tenv.getTypeVariable();
+
+    // Unify expression with a list type.
+    inferencer.unify(exprType, new ListType(elemType), "hd expects a list");
+
+    // Return the element type (most specific form).
+    return inferencer.getSubstitutions().apply(elemType);
+}
+
 
     @Override
     public void displaySubtree(int indentAmt)
