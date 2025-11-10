@@ -24,14 +24,18 @@ import environment.Environment;
 import environment.TypeEnvironment;
 import lexer.TokenType;
 import java.util.LinkedList;
+import ast.typesystem.types.IntType;
+import ast.typesystem.types.RealType;
+import ast.typesystem.types.BoolType;
+import ast.typesystem.types.ListType;
+import ast.typesystem.types.VarType;
 
 /**
  * This node represents a binary operation.
  * 
  * @author Zach Kissel
  */
-public final class BinOpNode extends SyntaxNode
-{
+public final class BinOpNode extends SyntaxNode {
     private TokenType op;
     private SyntaxNode leftTerm;
     private SyntaxNode rightTerm;
@@ -45,8 +49,7 @@ public final class BinOpNode extends SyntaxNode
      * @param line  the line of code the node is associated with.
      */
     public BinOpNode(SyntaxNode lterm, TokenType op, SyntaxNode rterm,
-            long line)
-    {
+            long line) {
         super(line);
         this.op = op;
         this.leftTerm = lterm;
@@ -58,8 +61,7 @@ public final class BinOpNode extends SyntaxNode
      * 
      * @param indentAmt the amout of indentation to perform.
      */
-    public void displaySubtree(int indentAmt)
-    {
+    public void displaySubtree(int indentAmt) {
         printIndented("BinOp[" + op + "](", indentAmt);
         leftTerm.displaySubtree(indentAmt + 2);
         rightTerm.displaySubtree(indentAmt + 2);
@@ -83,8 +85,7 @@ public final class BinOpNode extends SyntaxNode
         rval = rightTerm.evaluate(env);
 
         // ---------- List concatenation (++) ----------
-        if (op == TokenType.CONCAT)
-        {
+        if (op == TokenType.CONCAT) {
             if (!(lval instanceof LinkedList<?>) || !(rval instanceof LinkedList<?>))
                 throw new EvaluationException();
 
@@ -93,9 +94,19 @@ public final class BinOpNode extends SyntaxNode
 
             // First non-null element class on each side (homogeneity check)
             Class<?> leftElemType = null;
-            for (Object o : leftList) { if (o != null) { leftElemType = o.getClass(); break; } }
+            for (Object o : leftList) {
+                if (o != null) {
+                    leftElemType = o.getClass();
+                    break;
+                }
+            }
             Class<?> rightElemType = null;
-            for (Object o : rightList) { if (o != null) { rightElemType = o.getClass(); break; } }
+            for (Object o : rightList) {
+                if (o != null) {
+                    rightElemType = o.getClass();
+                    break;
+                }
+            }
 
             if (leftElemType != null && rightElemType != null && !leftElemType.equals(rightElemType))
                 throw new EvaluationException();
@@ -113,8 +124,7 @@ public final class BinOpNode extends SyntaxNode
                         || lval instanceof Boolean))
             throw new EvaluationException();
 
-        if (lval.getClass() != rval.getClass())
-        {
+        if (lval.getClass() != rval.getClass()) {
             logError("mixed type expression.");
             throw new EvaluationException();
         }
@@ -122,37 +132,35 @@ public final class BinOpNode extends SyntaxNode
             useDouble = true;
 
         // Perform the operation base on the type.
-        switch (op)
-        {
-        case ADD:
-            if (useDouble)
-                return (Double) lval + (Double) rval;
-            return (Integer) lval + (Integer) rval;
-        case SUB:
-            if (useDouble)
-                return (Double) lval - (Double) rval;
-            return (Integer) lval - (Integer) rval;
-        case MULT:
-            if (useDouble)
-                return (Double) lval * (Double) rval;
-            return (Integer) lval * (Integer) rval;
-        case DIV:
-            if (useDouble)
-                return (Double) lval / (Double) rval;
-            return (Integer) lval / (Integer) rval;
-        case MOD:
-            if (useDouble)
-            {
-                logError("Error: Mod requires integer arguments.");
+        switch (op) {
+            case ADD:
+                if (useDouble)
+                    return (Double) lval + (Double) rval;
+                return (Integer) lval + (Integer) rval;
+            case SUB:
+                if (useDouble)
+                    return (Double) lval - (Double) rval;
+                return (Integer) lval - (Integer) rval;
+            case MULT:
+                if (useDouble)
+                    return (Double) lval * (Double) rval;
+                return (Integer) lval * (Integer) rval;
+            case DIV:
+                if (useDouble)
+                    return (Double) lval / (Double) rval;
+                return (Integer) lval / (Integer) rval;
+            case MOD:
+                if (useDouble) {
+                    logError("Error: Mod requires integer arguments.");
+                    throw new EvaluationException();
+                }
+                return (Integer) lval % (Integer) rval;
+            case AND:
+                return (Boolean) lval && (Boolean) rval;
+            case OR:
+                return (Boolean) lval || (Boolean) rval;
+            default:
                 throw new EvaluationException();
-            }
-            return (Integer) lval % (Integer) rval;
-        case AND:
-            return (Boolean) lval && (Boolean) rval;
-        case OR:
-            return (Boolean) lval || (Boolean) rval;
-        default:
-            throw new EvaluationException();
         }
 
     }
@@ -167,8 +175,67 @@ public final class BinOpNode extends SyntaxNode
      * @throws TypeException if there is a type error.
      */
     @Override
-    public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'typeOf'");
+public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException
+{
+    // Determine the type of each operand.
+    Type leftType  = leftTerm.typeOf(tenv, inferencer);
+    Type rightType = rightTerm.typeOf(tenv, inferencer);
+
+    // Unify left and right sides first.
+    inferencer.unify(leftType, rightType, "Binary operand type mismatch");
+
+    // Apply substitutions to get the most specific (resolved) types.
+    leftType  = inferencer.getSubstitutions().apply(leftType);
+    rightType = inferencer.getSubstitutions().apply(rightType);
+
+    // Dispatch based on the operator type.
+    switch (op)
+    {
+        // ---------- Arithmetic operators ----------
+        case ADD:
+        case SUB:
+        case MULT:
+        case DIV:
+            if (leftType instanceof IntType || leftType instanceof RealType)
+                return leftType;
+            throw new TypeException("Arithmetic operations require numeric types.");
+
+        // ---------- Modulus ----------
+        case MOD:
+            if (leftType instanceof IntType)
+                return new IntType();
+            throw new TypeException("mod requires integer operands.");
+
+        // ---------- Logical operators ----------
+        case AND:
+        case OR:
+            if (leftType instanceof BoolType)
+                return new BoolType();
+            throw new TypeException("Logical operations require boolean operands.");
+
+        // ---------- List concatenation (++) ----------
+        case CONCAT:
+        {
+            VarType elem = tenv.getTypeVariable(); // fresh type variable
+            inferencer.unify(leftType,  new ListType(elem), "Left operand must be a list");
+            inferencer.unify(rightType, new ListType(elem), "Right operand must be a list");
+            return inferencer.getSubstitutions().apply(leftType);
+        }
+
+        // ---------- Relational operators (<, >, <=, >=, =, !=) ----------
+        case LT:
+        case GT:
+        case LTE:
+        case GTE:
+        case EQ:
+        case NEQ:
+            if (leftType instanceof IntType || leftType instanceof RealType)
+                return new BoolType();
+            throw new TypeException("Relational operations require numeric operands.");
+
+        default:
+            throw new TypeException("Unknown binary operator: " + op);
     }
+}
+
 }

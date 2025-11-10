@@ -24,6 +24,7 @@ import ast.typesystem.types.RealType;
 import ast.typesystem.types.Type;
 import ast.typesystem.types.VarType;
 import environment.TypeEnvironment;
+import ast.typesystem.types.ListType;
 
 /**
  * This data structure tracks the substitution map created by the unification algorithm.
@@ -76,6 +77,16 @@ public class Substitutions {
             if (res != null)
                 return res;
             return type;
+        }
+        // Handle the list type.
+        else if (type instanceof ListType)
+        {
+            Type elemType = ((ListType) type).getElementType();
+            Type newElemType = apply(elemType);
+            if (newElemType != elemType)
+                return new ListType(newElemType);
+            else
+                return type;
         }
 
         else
@@ -138,6 +149,15 @@ public class Substitutions {
             } else
                 return currType;
         }
+        // Handle list type substitutions.
+        else if (currType instanceof ListType) {
+            Type elemType = ((ListType) currType).getElementType();
+            Type newElemType = propagateSubstitution(tv, newType, elemType);
+            if (newElemType != elemType)
+                return new ListType(newElemType);
+            else
+                return currType;
+        }
 
         // When in doubt, do nothing.
         return currType;
@@ -159,6 +179,15 @@ public class Substitutions {
         if (type instanceof BoolType || type instanceof IntType
                 || type instanceof RealType)
             return type;
+        // Handle the list type.
+        else if (type instanceof ListType) {
+            Type elemType = ((ListType) type).getElementType();
+            Type newElemType = externalizeHelper(exSubst, tenv, elemType);
+            if (newElemType != elemType)
+                return new ListType(newElemType);
+            else
+                return type;
+        }
 
         // Handle the var type.
         else if (type instanceof VarType) {
