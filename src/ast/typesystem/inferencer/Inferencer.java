@@ -140,6 +140,12 @@ public class Inferencer
         {
             return !tv.equals((VarType) ty);
         }
+        // Check list type.
+        else if (ty instanceof ListType)
+        {
+            ListType lt = (ListType) ty;
+            return noOccurrence(tv, lt.getElementType());
+        }
     
         return false;
     }
