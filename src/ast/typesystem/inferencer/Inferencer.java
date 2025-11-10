@@ -22,6 +22,7 @@ import ast.typesystem.types.IntType;
 import ast.typesystem.types.RealType;
 import ast.typesystem.types.Type;
 import ast.typesystem.types.VarType;
+import ast.typesystem.types.ListType;
 
 /**
  * Represents the core type infrencer. It amasses a set of type equations and
@@ -87,6 +88,15 @@ public class Inferencer
         // The types are equal nothing else to do.
         if (type1.equals(type2))
             return;
+        
+        // Unify list types.
+        if (type1 instanceof ListType && type2 instanceof ListType)
+        {
+            ListType lt1 = (ListType) type1;
+            ListType lt2 = (ListType) type2;
+            unify(lt1.getElementType(), lt2.getElementType(), msg);
+            return;
+        }
 
         // Bind type1 to type2 if possible.
         if (type1 instanceof VarType)
