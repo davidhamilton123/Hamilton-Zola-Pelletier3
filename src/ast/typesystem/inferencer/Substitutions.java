@@ -24,6 +24,7 @@ import ast.typesystem.types.RealType;
 import ast.typesystem.types.Type;
 import ast.typesystem.types.VarType;
 import environment.TypeEnvironment;
+import ast.typesystem.types.ListType;
 
 /**
  * This data structure tracks the substitution map created by the unification algorithm.
@@ -136,6 +137,15 @@ public class Substitutions {
                     ((VarType) newType).copyConstraints(tv);
                 return newType;
             } else
+                return currType;
+        }
+        // Handle list type substitutions.
+        else if (currType instanceof ListType) {
+            Type elemType = ((ListType) currType).getElementType();
+            Type newElemType = propagateSubstitution(tv, newType, elemType);
+            if (newElemType != elemType)
+                return new ListType(newElemType);
+            else
                 return currType;
         }
 
