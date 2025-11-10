@@ -78,6 +78,16 @@ public class Substitutions {
                 return res;
             return type;
         }
+        // Handle the list type.
+        else if (type instanceof ListType)
+        {
+            Type elemType = ((ListType) type).getElementType();
+            Type newElemType = apply(elemType);
+            if (newElemType != elemType)
+                return new ListType(newElemType);
+            else
+                return type;
+        }
 
         else
             return null;
@@ -169,6 +179,15 @@ public class Substitutions {
         if (type instanceof BoolType || type instanceof IntType
                 || type instanceof RealType)
             return type;
+        // Handle the list type.
+        else if (type instanceof ListType) {
+            Type elemType = ((ListType) type).getElementType();
+            Type newElemType = externalizeHelper(exSubst, tenv, elemType);
+            if (newElemType != elemType)
+                return new ListType(newElemType);
+            else
+                return type;
+        }
 
         // Handle the var type.
         else if (type instanceof VarType) {
