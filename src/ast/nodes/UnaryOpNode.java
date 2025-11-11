@@ -1,115 +1,69 @@
-/*
- *   Copyright (C) 2022 -- 2025  Zachary A. Kissel
- *
- *   This program is free software: you can redistribute it and/or modify
- *   it under the terms of the GNU General Public License as published by
- *   the Free Software Foundation, either version 3 of the License, or
- *   (at your option) any later version.
- *
- *   This program is distributed in the hope that it will be useful,
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *   GNU General Public License for more details.
- *
- *   You should have received a copy of the GNU General Public License
- *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
 package ast.nodes;
 
 import ast.EvaluationException;
 import ast.typesystem.TypeException;
 import ast.typesystem.inferencer.Inferencer;
+import ast.typesystem.types.BoolType;
+import ast.typesystem.types.IntType;
+import ast.typesystem.types.RealType;
 import ast.typesystem.types.Type;
 import environment.Environment;
 import environment.TypeEnvironment;
 import lexer.TokenType;
 
-/**
- * This node represents the unary op node.
- * 
- * @author Zach Kissel
- */
-public final class UnaryOpNode extends SyntaxNode
-{
-    private TokenType op;
-    private SyntaxNode expr;
+public final class UnaryOpNode extends SyntaxNode {
+    private final TokenType op;
+    private final SyntaxNode expr;
 
-    /**
-     * Constructs a new binary operation syntax node.
-     * 
-     * @param expr the operand.
-     * @param op   the binary operation to perform.
-     * @param line the line of code the node is associated with.
-     */
-    public UnaryOpNode(SyntaxNode expr, TokenType op, long line)
-    {
+    public UnaryOpNode(SyntaxNode expr, TokenType op, long line) {
         super(line);
         this.op = op;
         this.expr = expr;
     }
 
-    /**
-     * Display a AST inferencertree with the indentation specified.
-     * 
-     * @param indentAmt the amout of indentation to perform.
-     */
-    public void displaySubtree(int indentAmt)
-    {
-        printIndented("UnaryOp[" + op + "](", indentAmt);
+    @Override
+    public void displaySubtree(int indentAmt) {
+        printIndented("Unary[" + op + "](", indentAmt);
         expr.displaySubtree(indentAmt + 2);
         printIndented(")", indentAmt);
     }
 
-    /**
-     * Evaluate the node.
-     * 
-     * @param env the executional environment we should evaluate the node under.
-     * @return the object representing the result of the evaluation.
-     * @throws EvaluationException if the evaluation fails.
-     */
     @Override
     public Object evaluate(Environment env) throws EvaluationException {
-        Object val;
+        Object v = expr.evaluate(env);
 
-        val = expr.evaluate(env);
-
-        // Perform the operation based on the type.
-        switch (op)
-        {
-        case NOT:
-            if (!(val instanceof Boolean))
-            {
-                logError("Boolean expected.");
-                throw new EvaluationException();
-            }
-            return !((Boolean) val);
-        case SUB:
-            if (!(val instanceof Integer) && !(val instanceof Double))
-            {
-                logError("Integer or real expected.");
-                throw new EvaluationException();
-            }
-            if (val instanceof Integer)
-                return -1 * (Integer) val;
-            else 
-                return -1 * (Double) val;
-        default:
+        if (op == TokenType.NOT) {
+            if (v instanceof Boolean) return !((Boolean) v);
+            logError("not expects a boolean");
             throw new EvaluationException();
         }
+
+        if (op == TokenType.SUB) {
+            if (v instanceof Integer) return -((Integer) v);
+            if (v instanceof Double)  return -((Double) v);
+            logError("negation expects a number");
+            throw new EvaluationException();
+        }
+
+        logError("unknown unary operator " + op);
+        throw new EvaluationException();
     }
 
-    /**
-     * Determine the type of the syntax node. In particluar bool, int, real,
-     * generic, or function.
-     * 
-     * @param tenv       the type environment.
-     * @param inferencer the type inferencer
-     * @return The type of the syntax node.
-     * @throws TypeException if there is a type error.
-     */
     @Override
     public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'typeOf'");
+        Type t = expr.typeOf(tenv, inferencer);
+
+        if (op == TokenType.NOT) {
+            if (t instanceof BoolType) return new BoolType();
+            throw new TypeException(buildErrorMessage("not expects a boolean"));
+        }
+
+        if (op == TokenType.SUB) {
+            if (t instanceof IntType)  return new IntType();
+            if (t instanceof RealType) return new RealType();
+            throw new TypeException(buildErrorMessage("negation expects a number"));
+        }
+
+        throw new TypeException(buildErrorMessage("unknown unary operator " + op));
     }
 }

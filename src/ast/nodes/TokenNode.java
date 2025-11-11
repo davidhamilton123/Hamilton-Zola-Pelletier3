@@ -19,82 +19,82 @@ package ast.nodes;
 import ast.EvaluationException;
 import ast.typesystem.TypeException;
 import ast.typesystem.inferencer.Inferencer;
+import ast.typesystem.types.BoolType;
+import ast.typesystem.types.IntType;
+import ast.typesystem.types.RealType;
 import ast.typesystem.types.Type;
 import environment.Environment;
 import environment.TypeEnvironment;
 import lexer.Token;
 
 /**
- * This node represents the a token in the grammar.
- * 
- * @author Zach Kissel
+ * A leaf node that holds a single token.
+ * Used for identifiers and literals.
  */
 public final class TokenNode extends SyntaxNode {
-    private Token token; // The token type.
+    private final Token tok;
 
-    /**
-     * Constructs a new token node.
-     * 
-     * @param token the token to associate with the node.
-     * @param line  the line of code the node is associated with.
-     */
-    public TokenNode(Token token, long line) {
+    public TokenNode(Token tok, long line) {
         super(line);
-        this.token = token;
+        this.tok = tok;
     }
 
-    /**
-     * Display a AST inferencertree with the indentation specified.
-     * 
-     * @param indentAmt the amout of indentation to perform.
-     */
+    @Override
     public void displaySubtree(int indentAmt) {
-        printIndented("Token(" + token + ")", indentAmt);
+        printIndented("Token[" + tok.getValue() + "]", indentAmt);
     }
 
-    /**
-     * Evaluate the node.
-     * 
-     * @param env the executional environment we should evaluate the node under.
-     * @return the object representing the result of the evaluation.
-     * @throws EvaluationException if the evaluation fails.
-     */
     @Override
     public Object evaluate(Environment env) throws EvaluationException {
-        switch (token.getType()) {
-            case INT:
-                return Integer.valueOf(token.getValue());
-            case REAL:
-                return Double.valueOf(token.getValue());
-            case TRUE:
-                return Boolean.valueOf(true);
-            case FALSE:
-                return Boolean.valueOf(false);
-            case ID:
-                Object val = env.lookup(token);
-                if (val == null) {
-                    logError("undefined value " + token.getValue() + ".");
-                    throw new EvaluationException();
-                }
+        // First try identifier lookup
+        Object bound = env.lookup(tok);
+        if (bound != null) return bound;
 
-                return val;
-            default:
-                return token;
+        // Otherwise interpret as a literal at runtime
+        String v = tok.getValue();
+
+        if ("true".equals(v))  return Boolean.TRUE;
+        if ("false".equals(v)) return Boolean.FALSE;
+
+        // integer literal
+        if (v.matches("[0-9]+")) {
+            try { return Integer.parseInt(v); }
+            catch (NumberFormatException e) { /* fall through to real */ }
         }
+
+        // real literal
+        if (v.matches("([0-9]+\\.[0-9]+)([eE][+-]?[0-9]+)?")) {
+            try { return Double.parseDouble(v); }
+            catch (NumberFormatException e) { /* fall through */ }
+        }
+
+        // If we reach here it is an unbound identifier
+        logError(tok.getValue() + " is not defined.");
+        throw new EvaluationException();
     }
 
-    /**
-     * Determine the type of the syntax node. In particluar bool, int, real,
-     * generic, or function.
-     * 
-     * @param tenv       the type environment.
-     * @param inferencer the type inferencer
-     * @return The type of the syntax node.
-     * @throws TypeException if there is a type error.
-     */
     @Override
     public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'typeOf'");
+        // Identifier in the type environment
+        Type t = tenv.lookup(tok);
+        if (t != null) return t;
+
+        // Otherwise treat as a literal and return its concrete type
+        String v = tok.getValue();
+
+        if ("true".equals(v) || "false".equals(v)) {
+            return new BoolType();
+        }
+
+        if (v.matches("[0-9]+")) {
+            return new IntType();
+        }
+
+        if (v.matches("([0-9]+\\.[0-9]+)([eE][+-]?[0-9]+)?")) {
+            return new RealType();
+        }
+
+        // Not in env and not a literal means unbound variable
+        throw new TypeException(buildErrorMessage(tok.getValue() + " is not defined."));
     }
 }

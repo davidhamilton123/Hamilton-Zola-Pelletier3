@@ -12,7 +12,7 @@ import ast.typesystem.types.VarType;
 import environment.Environment;
 import environment.TypeEnvironment;
 
-public class LenNode extends SyntaxNode {
+public final class LenNode extends SyntaxNode {
     private final SyntaxNode expr;
 
     public LenNode(SyntaxNode expr, long lineNumber) {
@@ -21,29 +21,33 @@ public class LenNode extends SyntaxNode {
     }
 
     @Override
+    public void displaySubtree(int indentAmt) {
+        printIndented("len(", indentAmt);
+        expr.displaySubtree(indentAmt + 2);
+        printIndented(")", indentAmt);
+    }
+
+    @Override
     public Object evaluate(Environment env) throws EvaluationException {
         Object v = expr.evaluate(env);
 
-        if (!(v instanceof LinkedList<?> list))
+        if (!(v instanceof LinkedList<?> list)) {
+            logError("len expects a list");
             throw new EvaluationException();
+        }
 
-        return Integer.valueOf(list.size());
+        return list.size();
     }
 
     @Override
     public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException {
         Type exprType = expr.typeOf(tenv, inferencer);
+
         VarType elemType = tenv.getTypeVariable();
+        ListType listOfElem = new ListType(elemType);
 
-        inferencer.unify(exprType, new ListType(elemType), "len expects a list");
+        inferencer.unify(exprType, listOfElem, buildErrorMessage("len expects a list"));
 
-        // The length of a list is always an integer.
         return new IntType();
-    }
-
-    @Override
-    public void displaySubtree(int indentAmt) {
-        printIndented("len", indentAmt);
-        expr.displaySubtree(indentAmt + 2);
     }
 }

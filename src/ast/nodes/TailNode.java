@@ -11,7 +11,7 @@ import ast.typesystem.types.VarType;
 import environment.Environment;
 import environment.TypeEnvironment;
 
-public class TailNode extends SyntaxNode {
+public final class TailNode extends SyntaxNode {
     private final SyntaxNode expr;
 
     public TailNode(SyntaxNode expr, long lineNumber) {
@@ -20,35 +20,46 @@ public class TailNode extends SyntaxNode {
     }
 
     @Override
+    public void displaySubtree(int indentAmt) {
+        printIndented("tl(", indentAmt);
+        expr.displaySubtree(indentAmt + 2);
+        printIndented(")", indentAmt);
+    }
+
+    @Override
     public Object evaluate(Environment env) throws EvaluationException {
         Object v = expr.evaluate(env);
 
-        if (!(v instanceof LinkedList<?> list))
+        if (!(v instanceof LinkedList<?> list)) {
+            logError("tl expects a list");
             throw new EvaluationException();
+        }
 
-        if (list.isEmpty())
+        if (list.isEmpty()) {
+            logError("tl on empty list");
             throw new EvaluationException();
+        }
 
         LinkedList<Object> out = new LinkedList<>();
-        for (int i = 1; i < list.size(); i++)
+        for (int i = 1; i < list.size(); i++) {
             out.add(list.get(i));
+        }
         return out;
     }
 
     @Override
     public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException {
+        // infer the type of the operand
         Type exprType = expr.typeOf(tenv, inferencer);
+
+        // create a fresh element type and assert the operand is a list of that type
         VarType elemType = tenv.getTypeVariable();
+        ListType listOfElem = new ListType(elemType);
 
-        inferencer.unify(exprType, new ListType(elemType), "tl expects a list");
+        // unify operand type with list type
+        inferencer.unify(exprType, listOfElem, buildErrorMessage("tl expects a list"));
 
-        // The tail is itself a list of the same element type.
-        return inferencer.getSubstitutions().apply(exprType);
-    }
-
-    @Override
-    public void displaySubtree(int indentAmt) {
-        printIndented("tl", indentAmt);
-        expr.displaySubtree(indentAmt + 2);
+        // tl returns a list of the same element type
+        return inferencer.getSubstitutions().apply(listOfElem);
     }
 }

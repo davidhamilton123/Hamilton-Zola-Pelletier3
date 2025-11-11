@@ -26,96 +26,73 @@ import environment.Environment;
 import environment.TypeEnvironment;
 
 /**
- * This node represents the program.
- * 
- * @author Zach Kissel
+ * Program root node
  */
-public final class ProgNode extends SyntaxNode
-{
-    private LinkedList<SyntaxNode> exprs;
+public final class ProgNode extends SyntaxNode {
+    private final LinkedList<SyntaxNode> exprs;
 
-    /**
-     * Constructs a new program node which represents a list of expressions.
-     * 
-     * @param exprs a linked list of expressions (AST inferencertress).
-     * @param line  the line of code the node is associated with.
-     */
-    public ProgNode(LinkedList<SyntaxNode> exprs, long line)
-    {
+    public ProgNode(LinkedList<SyntaxNode> exprs, long line) {
         super(line);
         this.exprs = exprs;
     }
-    
-    /**
-     * Display a AST inferencertree with the indentation specified.
-     * 
-     * @param indentAmt the amout of indentation to perform.
-     */
-    public void displaySubtree(int indentAmt)
-    {
+
+    @Override
+    public void displaySubtree(int indentAmt) {
         printIndented("Prog(", indentAmt);
         for (SyntaxNode expr : exprs)
             expr.displaySubtree(indentAmt + 2);
         printIndented(")", indentAmt);
     }
 
-    /**
-     * Evaluate the node.
-     * 
-     * @param env the executional environment we should evaluate the node under.
-     * @return the object representing the result of the evaluation.
-     * @throws EvaluationException if the evaluation fails.
-     */
     @Override
     public Object evaluate(Environment env) throws EvaluationException {
-         Object res = null;
-
-        // Loop over the expressions evaluating every node.
+        Object res = null;
         for (SyntaxNode expr : exprs)
             res = expr.evaluate(env);
         return res;
     }
 
     /**
-     * Determine the type of the syntax node. In particluar bool, int, real,
-     * generic, or function.
-     * 
-     * @param tenv       the type environment.
-     * @param inferencer the type inferencer
-     * @return The type of the syntax node.
-     * @throws TypeException if there is a type error.
+     * Type pass for the whole program
+     * Binds global vals into the type environment as they appear
      */
     @Override
     public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException {
-        for (SyntaxNode ex : exprs)
-            ex.typeOf(tenv, inferencer);
+        if (exprs.isEmpty())
+            throw new TypeException("Invalid expression.");
 
-        if (exprs.size() == 0)
-            throw new TypeException("Inavalid expression.");
+        Type lastType = null;
 
-        Type rv = inferencer.getSubstitutions().apply(
-                exprs.get(exprs.size() - 1).typeOf(tenv, inferencer));
-        return rv;
+        for (SyntaxNode ex : exprs) {
+            // type the node
+            Type t = ex.typeOf(tenv, inferencer);
+
+            // if it is a global val, insert into the type environment now
+            if (ex instanceof ValNode) {
+                ValNode v = (ValNode) ex;
+                if (tenv.lookup(v.getNameToken()) == null) {
+                    tenv.updateEnvironment(v.getNameToken(), t);
+                } else {
+                    throw new TypeException(buildErrorMessage(v.getNameToken().getValue() + " already defined."));
+                }
+            }
+
+            lastType = t;
+        }
+
+        return inferencer.getSubstitutions().apply(lastType);
     }
 
     /**
-     * Type check the program.
-     * 
-     * @param tenv       the type environment.
-     * @param inferencer the type inferencer.
-     * @return true if the program type checks; otherwise, false.
+     * Boolean style type check used by file mode
      */
     public boolean typeCheck(TypeEnvironment tenv, Inferencer inferencer) {
         try {
-            for (SyntaxNode expr : exprs) {
-                expr.typeOf(tenv, inferencer);
-            }
-
+            typeOf(tenv, inferencer);
+            return true;
         } catch (TypeException ex) {
             System.out.println("Type Error: " + ex.getMessage());
             return false;
         }
-
-        return true;
     }
 }

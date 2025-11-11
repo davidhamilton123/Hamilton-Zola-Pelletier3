@@ -19,122 +19,137 @@ package ast.nodes;
 import ast.EvaluationException;
 import ast.typesystem.TypeException;
 import ast.typesystem.inferencer.Inferencer;
+import ast.typesystem.types.BoolType;
+import ast.typesystem.types.IntType;
+import ast.typesystem.types.RealType;
 import ast.typesystem.types.Type;
+import ast.typesystem.types.VarType;
 import environment.Environment;
 import environment.TypeEnvironment;
 import lexer.TokenType;
 
 /**
- * This node represents relational operations.
- * 
- * @author Zach Kissel
+ * Relational operator node.
+ * Supports: <  >  <=  >=  =  <>
  */
-public final class RelOpNode extends SyntaxNode
-{
-    private TokenType op;
-    private SyntaxNode leftExpr;
-    private SyntaxNode rightExpr;
+public final class RelOpNode extends SyntaxNode {
+    private final TokenType op;
+    private final SyntaxNode leftTerm;
+    private final SyntaxNode rightTerm;
 
-    /**
-     * Constructs a new binary operation syntax node.
-     * 
-     * @param lexpr the left operand.
-     * @param op    the binary operation to perform.
-     * @param rexpr the right operand.
-     * @param line  the line of code the node is associated with.
-     */
-    public RelOpNode(SyntaxNode lexpr, TokenType op, SyntaxNode rexpr,
-            long line)
-    {
+    public RelOpNode(SyntaxNode lterm, TokenType op, SyntaxNode rterm, long line) {
         super(line);
         this.op = op;
-        this.leftExpr = lexpr;
-        this.rightExpr = rexpr;
+        this.leftTerm = lterm;
+        this.rightTerm = rterm;
     }
 
-    /**
-     * Display a AST inferencertree with the indentation specified.
-     * 
-     * @param indentAmt the amout of indentation to perform.
-     */
-    public void displaySubtree(int indentAmt)
-    {
+    @Override
+    public void displaySubtree(int indentAmt) {
         printIndented("RelOp[" + op + "](", indentAmt);
-        leftExpr.displaySubtree(indentAmt + 2);
-        rightExpr.displaySubtree(indentAmt + 2);
+        leftTerm.displaySubtree(indentAmt + 2);
+        rightTerm.displaySubtree(indentAmt + 2);
         printIndented(")", indentAmt);
     }
 
-    /**
-     * Evaluate the node.
-     * 
-     * @param env the executional environment we should evaluate the node under.
-     * @return the object representing the result of the evaluation.
-     * @throws EvaluationException if the evaluation fails.
-     */
     @Override
     public Object evaluate(Environment env) throws EvaluationException {
-        Object lval;
-        Object rval;
-        boolean useDouble = false;
+        Object lv = leftTerm.evaluate(env);
+        Object rv = rightTerm.evaluate(env);
 
-        lval = leftExpr.evaluate(env);
-        rval = rightExpr.evaluate(env);
+        switch (op) {
+            // numeric comparisons
+            case LT:
+            case GT:
+            case LTE:
+            case GTE: {
+                if (!isNumber(lv) || !isNumber(rv)) {
+                    logError(op + " expects numeric operands");
+                    throw new EvaluationException();
+                }
+                double a = toDouble(lv);
+                double b = toDouble(rv);
+                switch (op) {
+                    case LT:  return a <  b;
+                    case GT:  return a >  b;
+                    case LTE: return a <= b;
+                    case GTE: return a >= b;
+                    default:  throw new EvaluationException();
+                }
+            }
 
-        // Make sure the type is sound.
-        if (!(lval instanceof Integer || lval instanceof Double)
-                && !(rval instanceof Double || rval instanceof Integer))
-            throw new EvaluationException();
+            // equality
+            case EQ:
+                if (isNumber(lv) && isNumber(rv)) {
+                    return toDouble(lv) == toDouble(rv);
+                }
+                return lv != null ? lv.equals(rv) : rv == null;
 
-        if (lval.getClass() != rval.getClass())
-        {
-            logError("mixed type expression.");
-            return null;
-        }
+            case NEQ:
+                if (isNumber(lv) && isNumber(rv)) {
+                    return toDouble(lv) != toDouble(rv);
+                }
+                return !(lv != null ? lv.equals(rv) : rv == null);
 
-        if (lval instanceof Double)
-            useDouble = true;
-
-        // Perform the operation base on the type.
-        switch (op)
-        {
-        case LT:
-            if (useDouble)
-                return (Double) lval < (Double) rval;
-            return (Integer) lval < (Integer) rval;
-        case LTE:
-            if (useDouble)
-                return (Double) lval <= (Double) rval;
-            return (Integer) lval <= (Integer) rval;
-        case GT:
-            if (useDouble)
-                return (Double) lval > (Double) rval;
-            return (Integer) lval > (Integer) rval;
-        case GTE:
-            if (useDouble)
-                return (Double) lval >= (Double) rval;
-            return (Integer) lval >= (Integer) rval;
-        case EQ:
-            return lval.equals(rval);
-        case NEQ:
-            return !(lval.equals(rval));
-        default:
-            throw new EvaluationException();
+            default:
+                logError("unknown relational operator " + op);
+                throw new EvaluationException();
         }
     }
 
-    /**
-     * Determine the type of the syntax node. In particluar bool, int, real,
-     * generic, or function.
-     * 
-     * @param tenv       the type environment.
-     * @param inferencer the type inferencer
-     * @return The type of the syntax node.
-     * @throws TypeException if there is a type error.
-     */
+    private static boolean isNumber(Object o) {
+        return o instanceof Integer || o instanceof Double;
+    }
+
+    private static double toDouble(Object v) {
+        return (v instanceof Integer) ? ((Integer) v).doubleValue() : (Double) v;
+    }
+
     @Override
     public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'typeOf'");
+        Type lt = leftTerm.typeOf(tenv, inferencer);
+        Type rt = rightTerm.typeOf(tenv, inferencer);
+
+        switch (op) {
+            // numeric relational operators
+            case LT:
+            case GT:
+            case LTE:
+            case GTE: {
+                // promote to real if either side is real, otherwise int
+                if (lt instanceof RealType || rt instanceof RealType) {
+                    RealType r = new RealType();
+                    inferencer.unify(lt, r, buildErrorMessage(op + " expects numbers"));
+                    inferencer.unify(rt, r, buildErrorMessage(op + " expects numbers"));
+                } else {
+                    IntType i = new IntType();
+                    inferencer.unify(lt, i, buildErrorMessage(op + " expects numbers"));
+                    inferencer.unify(rt, i, buildErrorMessage(op + " expects numbers"));
+                }
+                return new BoolType();
+            }
+
+            // equality and inequality
+            case EQ:
+            case NEQ: {
+                // allow numeric mixing by promoting to real
+                if ((lt instanceof IntType && rt instanceof RealType)
+                        || (lt instanceof RealType && rt instanceof IntType)
+                        || (lt instanceof RealType && rt instanceof RealType)) {
+                    RealType r = new RealType();
+                    inferencer.unify(lt, r, buildErrorMessage(op + " numeric comparison"));
+                    inferencer.unify(rt, r, buildErrorMessage(op + " numeric comparison"));
+                } else {
+                    // otherwise require same type via a fresh type variable
+                    VarType a = tenv.getTypeVariable();
+                    inferencer.unify(lt, a, buildErrorMessage(op + " requires compatible types"));
+                    inferencer.unify(rt, a, buildErrorMessage(op + " requires compatible types"));
+                }
+                return new BoolType();
+            }
+
+            default:
+                throw new TypeException(buildErrorMessage("unknown relational operator " + op));
+        }
     }
 }

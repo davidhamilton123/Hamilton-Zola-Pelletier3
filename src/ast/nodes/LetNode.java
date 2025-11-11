@@ -1,22 +1,4 @@
-/*
- *   Copyright (C) 2022 -- 2025  Zachary A. Kissel
- *
- *   This program is free software: you can redistribute it and/or modify
- *   it under the terms of the GNU General Public License as published by
- *   the Free Software Foundation, either version 3 of the License, or
- *   (at your option) any later version.
- *
- *   This program is distributed in the hope that it will be useful,
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *   GNU General Public License for more details.
- *
- *   You should have received a copy of the GNU General Public License
- *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
 package ast.nodes;
-
-import java.util.LinkedList;
 
 import ast.EvaluationException;
 import ast.typesystem.TypeException;
@@ -27,84 +9,75 @@ import environment.TypeEnvironment;
 import lexer.Token;
 
 /**
- * This node represents a let expression.
- * 
- * @author Zach Kissel
+ * let x = bound in body
+ * No scope object available, so we:
+ *  - save any prior binding for x,
+ *  - bind x to the new value,
+ *  - evaluate the body,
+ *  - restore the prior binding (or clear by setting null if none existed).
  */
-public final class LetNode extends SyntaxNode
-{
-    private Token var;
-    private SyntaxNode varExpr;
-    private SyntaxNode expr;
+public final class LetNode extends SyntaxNode {
+    private final Token name;
+    private final SyntaxNode bound;
+    private final SyntaxNode body;
 
-    /**
-     * Constructs a new binary operation syntax node.
-     * 
-     * @param var     the variable identifier.
-     * @param varExpr the expression that give the varaible value.
-     * @param expr    the expression that uses the variables value.
-     * @param line    the line of code the node is associated with.
-     */
-    public LetNode(Token var, SyntaxNode varExpr, SyntaxNode expr, long line)
-    {
-        super(line);
-        this.var = var;
-        this.varExpr = varExpr;
-        this.expr = expr;
+    public LetNode(Token name, SyntaxNode bound, SyntaxNode body, long lineNumber) {
+        super(lineNumber);
+        this.name = name;
+        this.bound = bound;
+        this.body = body;
     }
 
-    /**
-     * Evaluate the node.
-     * 
-     * @param env the executional environment we should evaluate the node under.
-     * @return the object representing the result of the evaluation.
-     * @throws EvaluationException if the evaluation fails.
-     */
-    public Object evaluate(Environment env) throws EvaluationException
-    {
-
-        Object varVal = null;
-        Environment envCopy = env.copy(); // Copy the environment to create a
-                                          // new scope.
-
-        varVal = varExpr.evaluate(env);
-
-        if (varVal instanceof Integer || varVal instanceof Double
-                || varVal instanceof Boolean || varVal instanceof LinkedList)
-            envCopy.updateEnvironment(var, varVal);
-        else
-            logError("[Internal] Failed to add " + var + " with  value "
-                    + varVal.getClass());
-
-        Object value = expr.evaluate(envCopy);
-        return value;
+    @Override
+    public void displaySubtree(int indentAmt) {
+        printIndented("let " + name.getValue() + " =", indentAmt);
+        bound.displaySubtree(indentAmt + 2);
+        printIndented("in", indentAmt);
+        body.displaySubtree(indentAmt + 2);
     }
 
-    /**
-     * Display a AST subtree with the indentation specified.
-     * 
-     * @param indentAmt the amout of indentation to perform.
-     */
-    public void displaySubtree(int indentAmt)
-    {
-        printIndented("let[" + var.getValue() + "](", indentAmt);
-        varExpr.displaySubtree(indentAmt + 2);
-        expr.displaySubtree(indentAmt + 2);
-        printIndented(")", indentAmt);
+    @Override
+    public Object evaluate(Environment env) throws EvaluationException {
+        // save previous binding if any
+        Object old = env.lookup(name);
+        boolean had = (old != null);
+
+        // bind to new value
+        Object val = bound.evaluate(env);
+        env.updateEnvironment(name, val);
+
+        try {
+            return body.evaluate(env);
+        } finally {
+            // restore the prior binding
+            if (had) {
+                env.updateEnvironment(name, old);
+            } else {
+                // no remove available in your Environment, so clear by setting null
+                // your env.lookup returns null for "not bound", so this mimics unbinding
+                env.updateEnvironment(name, null);
+            }
+        }
     }
 
-    /**
-     * Determine the type of the syntax node. In particluar bool, int, real,
-     * generic, or function.
-     * 
-     * @param tenv       the type environment.
-     * @param inferencer the type inferencer
-     * @return The type of the syntax node.
-     * @throws TypeException if there is a type error.
-     */
     @Override
     public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'typeOf'");
+        Type boundType = bound.typeOf(tenv, inferencer);
+
+        // extend type environment by shadowing the name for the body
+        Type oldT = tenv.lookup(name);
+        boolean had = (oldT != null);
+        tenv.updateEnvironment(name, boundType);
+
+        try {
+            return body.typeOf(tenv, inferencer);
+        } finally {
+            if (had) {
+                tenv.updateEnvironment(name, oldT);
+            } else {
+                // mirror the runtime trick, clear the temporary binding
+                tenv.updateEnvironment(name, null);
+            }
+        }
     }
 }

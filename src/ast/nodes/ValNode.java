@@ -25,55 +25,43 @@ import environment.TypeEnvironment;
 import lexer.Token;
 
 /**
- * This node represents a global value.
- * 
- * @author Zach Kissel
+ * Global value declaration
+ *
+ * Syntax:
+ *   val x := expr;
  */
-public final class ValNode extends SyntaxNode
-{
-    private Token name;
-    private SyntaxNode expr;
+public final class ValNode extends SyntaxNode {
+    private final Token name;
+    private final SyntaxNode expr;
 
-    /**
-     * Constructs a new value node that represents a global value.
-     * 
-     * @param name the name of the value.
-     * @param expr the value of the name.
-     * @param line the line of code the node is associated with.
-     */
-    public ValNode(Token name, SyntaxNode expr, long line)
-    {
+    public ValNode(Token name, SyntaxNode expr, long line) {
         super(line);
         this.name = name;
         this.expr = expr;
     }
 
-    /**
-     * Display a AST inferencertree with the indentation specified.
-     * 
-     * @param indentAmt the amout of indentation to perform.
-     */
-    public void displaySubtree(int indentAmt)
-    {
+    /** Expose the name token so ProgNode can bind globals in the type env. */
+    public Token getNameToken() {
+        return name;
+    }
+
+    @Override
+    public void displaySubtree(int indentAmt) {
         printIndented("Val[" + name.getValue() + "](", indentAmt);
         expr.displaySubtree(indentAmt + 2);
         printIndented(")", indentAmt);
     }
 
     /**
-     * Evaluate the node.
-     * 
-     * @param env the executional environment we should evaluate the node under.
-     * @return the object representing the result of the evaluation.
-     * @throws EvaluationException if the evaluation fails.
+     * Runtime semantics:
+     * evaluate expr, bind it to x if x is not already defined.
      */
     @Override
     public Object evaluate(Environment env) throws EvaluationException {
         Object val = expr.evaluate(env);
-        if (env.lookup(name) == null)
+        if (env.lookup(name) == null) {
             env.updateEnvironment(name, val);
-        else 
-        {
+        } else {
             logError(name.getValue() + " already defined.");
             throw new EvaluationException();
         }
@@ -81,17 +69,12 @@ public final class ValNode extends SyntaxNode
     }
 
     /**
-     * Determine the type of the syntax node. In particluar bool, int, real,
-     * generic, or function.
-     * 
-     * @param tenv       the type environment.
-     * @param inferencer the type inferencer
-     * @return The type of the syntax node.
-     * @throws TypeException if there is a type error.
+     * Type checking:
+     * ProgNode inserts globals into the type environment.
+     * Here we only compute and return the expression type.
      */
     @Override
     public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'typeOf'");
+        return expr.typeOf(tenv, inferencer);
     }
 }

@@ -11,51 +11,50 @@ import ast.typesystem.types.VarType;
 import environment.Environment;
 import environment.TypeEnvironment;
 
-public class HeadNode extends SyntaxNode
-{
+public final class HeadNode extends SyntaxNode {
     private final SyntaxNode expr;
 
-    public HeadNode(SyntaxNode expr, long lineNumber)
-    {
+    public HeadNode(SyntaxNode expr, long lineNumber) {
         super(lineNumber);
         this.expr = expr;
     }
 
     @Override
-    public Object evaluate(Environment env) throws EvaluationException
-    {
+    public void displaySubtree(int indentAmt) {
+        printIndented("hd(", indentAmt);
+        expr.displaySubtree(indentAmt + 2);
+        printIndented(")", indentAmt);
+    }
+
+    @Override
+    public Object evaluate(Environment env) throws EvaluationException {
         Object v = expr.evaluate(env);
 
-        if (!(v instanceof LinkedList<?> list))
+        if (!(v instanceof LinkedList<?> list)) {
+            logError("hd expects a list");
             throw new EvaluationException();
-
-        if (list.isEmpty())
+        }
+        if (list.isEmpty()) {
+            logError("hd on empty list");
             throw new EvaluationException();
+        }
 
         return list.getFirst();
     }
 
-   @Override
-public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException
-{
-    // Determine the type of the expression.
-    Type exprType = expr.typeOf(tenv, inferencer);
-
-    // Create a fresh type variable for the list element.
-    VarType elemType = tenv.getTypeVariable();
-
-    // Unify expression with a list type.
-    inferencer.unify(exprType, new ListType(elemType), "hd expects a list");
-
-    // Return the element type (most specific form).
-    return inferencer.getSubstitutions().apply(elemType);
-}
-
-
     @Override
-    public void displaySubtree(int indentAmt)
-    {
-        printIndented("hd", indentAmt);
-        expr.displaySubtree(indentAmt + 2);
+    public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException {
+        // infer type of the list expression
+        Type exprType = expr.typeOf(tenv, inferencer);
+
+        // fresh element type and list-of-element type
+        VarType elemType = tenv.getTypeVariable();
+        ListType listOfElem = new ListType(elemType);
+
+        // unify operand with a list type
+        inferencer.unify(exprType, listOfElem, buildErrorMessage("hd expects a list"));
+
+        // head returns the element type after applying substitutions
+        return inferencer.getSubstitutions().apply(elemType);
     }
 }
