@@ -11,14 +11,27 @@ import ast.typesystem.types.VarType;
 import environment.Environment;
 import environment.TypeEnvironment;
 
+/**
+ * Represents the {@code hd(<list>)} operation in MFL.
+ * Extracts the first element of a list.
+ */
 public final class HeadNode extends SyntaxNode {
     private final SyntaxNode expr;
 
+    /**
+     * Constructs a head operation node.
+     *
+     * @param expr the list expression whose head is being extracted
+     * @param lineNumber the source line number of this node
+     */
     public HeadNode(SyntaxNode expr, long lineNumber) {
         super(lineNumber);
         this.expr = expr;
     }
 
+    /**
+     * Displays the subtree for debugging purposes.
+     */
     @Override
     public void displaySubtree(int indentAmt) {
         printIndented("hd(", indentAmt);
@@ -26,6 +39,13 @@ public final class HeadNode extends SyntaxNode {
         printIndented(")", indentAmt);
     }
 
+    /**
+     * Evaluates {@code hd(<list>)}.
+     *
+     * @param env the runtime environment
+     * @return the first element of the evaluated list
+     * @throws EvaluationException if the operand is not a list or is empty
+     */
     @Override
     public Object evaluate(Environment env) throws EvaluationException {
         Object v = expr.evaluate(env);
@@ -42,19 +62,24 @@ public final class HeadNode extends SyntaxNode {
         return list.getFirst();
     }
 
+    /**
+     * Performs type inference for {@code hd(<list>)}.
+     * Ensures operand is a list and returns the element type.
+     *
+     * @param tenv the type environment
+     * @param inferencer the type inferencer
+     * @return the element type of the list
+     * @throws TypeException if operand is not a list
+     */
     @Override
     public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException {
-        // infer type of the list expression
         Type exprType = expr.typeOf(tenv, inferencer);
 
-        // fresh element type and list-of-element type
         VarType elemType = tenv.getTypeVariable();
         ListType listOfElem = new ListType(elemType);
 
-        // unify operand with a list type
         inferencer.unify(exprType, listOfElem, buildErrorMessage("hd expects a list"));
 
-        // head returns the element type after applying substitutions
         return inferencer.getSubstitutions().apply(elemType);
     }
 }
