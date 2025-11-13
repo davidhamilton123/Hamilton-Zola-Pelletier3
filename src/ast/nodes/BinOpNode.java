@@ -15,17 +15,29 @@ import environment.Environment;
 import environment.TypeEnvironment;
 import lexer.TokenType;
 
-/** Binary operations with proper Phase 3 typing and numeric promotion. */
+/**
+ * Represents a binary operation node.
+ * 
+ * @author Zach Kissel
+ */
 public final class BinOpNode extends SyntaxNode {
-    private final TokenType op;
     private final SyntaxNode leftTerm;
     private final SyntaxNode rightTerm;
+    private final TokenType op;
 
-    public BinOpNode(SyntaxNode lterm, TokenType op, SyntaxNode rterm, long line) {
+    /**
+     * Creates a new binary operation node.
+     * 
+     * @param leftTerm the left-hand side operand.
+     * @param op the operator token.
+     * @param rightTerm the right-hand side operand.
+     * @param line the line number.
+     */
+    public BinOpNode(SyntaxNode leftTerm, TokenType op, SyntaxNode rightTerm, long line) {
         super(line);
+        this.leftTerm = leftTerm;
+        this.rightTerm = rightTerm;
         this.op = op;
-        this.leftTerm = lterm;
-        this.rightTerm = rterm;
     }
 
     @Override
@@ -36,108 +48,150 @@ public final class BinOpNode extends SyntaxNode {
         printIndented(")", indentAmt);
     }
 
-    // ---------- evaluation with numeric promotion ----------
+    /**
+     * Evaluates the binary operation.
+     */
     @Override
     public Object evaluate(Environment env) throws EvaluationException {
         Object lval = leftTerm.evaluate(env);
         Object rval = rightTerm.evaluate(env);
 
-        // list concatenation
+        // Handle list concatenation.
         if (op == TokenType.CONCAT) {
             if (!(lval instanceof LinkedList<?>) || !(rval instanceof LinkedList<?>)) {
-                logError("++ expects two lists");
+                logError("++ expects two lists.");
                 throw new EvaluationException();
             }
-            LinkedList<Object> out = new LinkedList<>((LinkedList<?>) lval);
-            out.addAll((LinkedList<?>) rval);
-            return out;
+            LinkedList<Object> newList = new LinkedList<>((LinkedList<?>) lval);
+            newList.addAll((LinkedList<?>) rval);
+            return newList;
         }
 
-        // logical
+        // Handle logical operators.
         if (op == TokenType.AND || op == TokenType.OR) {
             if (!(lval instanceof Boolean) || !(rval instanceof Boolean)) {
-                logError("logical ops expect booleans");
+                logError("Logical operators expect boolean operands.");
                 throw new EvaluationException();
             }
-            return (op == TokenType.AND)
-                    ? ((Boolean) lval && (Boolean) rval)
-                    : ((Boolean) lval || (Boolean) rval);
+            if (op == TokenType.AND)
+                return (Boolean) lval && (Boolean) rval;
+            else
+                return (Boolean) lval || (Boolean) rval;
         }
 
-        // numeric promotion int -> real when mixed
+        // Handle arithmetic and relational operators.
         boolean leftNum = lval instanceof Integer || lval instanceof Double;
         boolean rightNum = rval instanceof Integer || rval instanceof Double;
+
         if (!leftNum || !rightNum) {
-            logError(op + " expects numbers");
+            logError("Operator " + op + " expects numeric operands.");
             throw new EvaluationException();
         }
+
+        boolean isIntOp = (lval instanceof Integer) && (rval instanceof Integer);
         double ld = (lval instanceof Integer) ? ((Integer) lval).doubleValue() : (Double) lval;
         double rd = (rval instanceof Integer) ? ((Integer) rval).doubleValue() : (Double) rval;
 
+        Object result;
+
         switch (op) {
-            case ADD:  return (isInt(lval) && isInt(rval)) ? ((Integer) lval + (Integer) rval) : ld + rd;
-            case SUB:  return (isInt(lval) && isInt(rval)) ? ((Integer) lval - (Integer) rval) : ld - rd;
-            case MULT: return (isInt(lval) && isInt(rval)) ? ((Integer) lval * (Integer) rval) : ld * rd;
-            case DIV:  return (isInt(lval) && isInt(rval)) ? ((Integer) lval / (Integer) rval) : ld / rd;
+            case ADD:
+                result = isIntOp ? ((Integer) lval + (Integer) rval) : ld + rd;
+                break;
+            case SUB:
+                result = isIntOp ? ((Integer) lval - (Integer) rval) : ld - rd;
+                break;
+            case MULT:
+                result = isIntOp ? ((Integer) lval * (Integer) rval) : ld * rd;
+                break;
+            case DIV:
+                // If both are ints, perform integer division, otherwise real division.
+                result = isIntOp ? ((Integer) lval / (Integer) rval) : ld / rd;
+                break;
             case MOD:
-                if (isInt(lval) && isInt(rval)) return (Integer) lval % (Integer) rval;
-                logError("mod requires integer operands");
-                throw new EvaluationException();
-            case LT:   return ld <  rd;
-            case GT:   return ld >  rd;
-            case LTE:  return ld <= rd;
-            case GTE:  return ld >= rd;
-            case EQ:   return ld == rd;
-            case NEQ:  return ld != rd;
+                if (isIntOp)
+                    result = ((Integer) lval % (Integer) rval);
+                else {
+                    logError("mod requires integer operands.");
+                    throw new EvaluationException();
+                }
+                break;
+            case LT:
+                result = ld < rd;
+                break;
+            case GT:
+                result = ld > rd;
+                break;
+            case LTE:
+                result = ld <= rd;
+                break;
+            case GTE:
+                result = ld >= rd;
+                break;
+            case EQ:
+                result = ld == rd;
+                break;
+            case NEQ:
+                result = ld != rd;
+                break;
             default:
-                logError("unknown binary operator " + op);
+                logError("Unknown binary operator: " + op);
                 throw new EvaluationException();
         }
+
+        // Ensure integer results remain integers.
+        if (result instanceof Double && isIntOp) {
+            double d = (Double) result;
+            if (d == Math.rint(d)) return (int) d;
+        }
+
+        return result;
     }
 
-    private static boolean isInt(Object o) { return o instanceof Integer; }
-
-    // ---------- typing with numeric promotion rules ----------
     @Override
     public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException {
         Type lt = leftTerm.typeOf(tenv, inferencer);
         Type rt = rightTerm.typeOf(tenv, inferencer);
 
         switch (op) {
-            // arithmetic: both numeric, result real if either real else int
-            case ADD: case SUB: case MULT: case DIV: {
+            case ADD:
+            case SUB:
+            case MULT:
+            case DIV:
                 if (!(isNumeric(lt) && isNumeric(rt)))
-                    throw new TypeException(buildErrorMessage(op + " expects numbers"));
-                if (lt instanceof RealType || rt instanceof RealType) return new RealType();
+                    throw new TypeException(buildErrorMessage(op + " expects numeric operands."));
+                if (lt instanceof RealType || rt instanceof RealType)
+                    return new RealType();
                 return new IntType();
-            }
-            case MOD: {
-                if (lt instanceof IntType && rt instanceof IntType) return new IntType();
-                throw new TypeException(buildErrorMessage("mod requires integer operands"));
-            }
-            // logical
-            case AND: case OR: {
-                if (lt instanceof BoolType && rt instanceof BoolType) return new BoolType();
-                throw new TypeException(buildErrorMessage("logical ops expect booleans"));
-            }
-            // list concat: both lists of same element type
-            case CONCAT: {
-                VarType elem = tenv.getTypeVariable();
-                inferencer.unify(lt, new ListType(elem), buildErrorMessage("++ left expects list"));
-                inferencer.unify(rt, new ListType(elem), buildErrorMessage("++ right expects list"));
-                return new ListType(elem);
-            }
-            // relations: numeric -> bool
-            case LT: case GT: case LTE: case GTE: case EQ: case NEQ: {
-                if (isNumeric(lt) && isNumeric(rt)) return new BoolType();
-                throw new TypeException(buildErrorMessage("relational ops expect numbers"));
-            }
+            case MOD:
+                if (lt instanceof IntType && rt instanceof IntType)
+                    return new IntType();
+                throw new TypeException(buildErrorMessage("mod requires integer operands."));
+            case AND:
+            case OR:
+                if (lt instanceof BoolType && rt instanceof BoolType)
+                    return new BoolType();
+                throw new TypeException(buildErrorMessage("Logical operators expect boolean operands."));
+            case CONCAT:
+                VarType elemType = tenv.getTypeVariable();
+                inferencer.unify(lt, new ListType(elemType), buildErrorMessage("++ expects two lists."));
+                inferencer.unify(rt, new ListType(elemType), buildErrorMessage("++ expects two lists."));
+                return new ListType(elemType);
+            case LT:
+            case LTE:
+            case GT:
+            case GTE:
+            case EQ:
+            case NEQ:
+                if (isNumeric(lt) && isNumeric(rt))
+                    return new BoolType();
+                throw new TypeException(buildErrorMessage("Relational operators expect numeric operands."));
             default:
-                throw new TypeException(buildErrorMessage("unknown binary operator " + op));
+                throw new TypeException(buildErrorMessage("Unknown binary operator: " + op));
         }
     }
 
-    private static boolean isNumeric(Type t) {
-        return t instanceof IntType || t instanceof RealType;
+    private boolean isNumeric(Type t) {
+        return (t instanceof IntType) || (t instanceof RealType);
     }
 }

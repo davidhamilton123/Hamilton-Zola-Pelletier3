@@ -246,6 +246,8 @@ public class Lexer
             return new Token(TokenType.LBRACKET, "[");
         case ']':
             return new Token(TokenType.RBRACKET, "]");
+        case ',':
+            return new Token(TokenType.COMMA, ",");
             
         default:
             return new Token(TokenType.UNKNOWN, String.valueOf(stream.getCurrentChar()));

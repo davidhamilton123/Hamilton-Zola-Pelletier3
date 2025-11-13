@@ -192,6 +192,11 @@ public enum TokenType
     CONCAT,
 
     /**
+     * Comma separator (used in lists).
+     */
+    COMMA,
+
+    /**
      * The end of the file token.
      */
     EOF

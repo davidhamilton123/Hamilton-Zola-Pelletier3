@@ -184,14 +184,16 @@ public class Token
             return "LEN";
         case EOF:
             return "EOF";
-            case CONCAT:
-                break;
-            case LBRACKET:
-                break;
-            case RBRACKET:
-                break;
-            default:
-                break;
+        case CONCAT:
+            return "CONCAT";
+        case LBRACKET:
+            return "LBRACKET";
+        case RBRACKET:
+            return "RBRACKET";
+        case COMMA:
+            return "COMMA";
+        default:
+            break;
         }
         return "";
     }

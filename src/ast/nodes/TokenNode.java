@@ -26,6 +26,7 @@ import ast.typesystem.types.Type;
 import environment.Environment;
 import environment.TypeEnvironment;
 import lexer.Token;
+import lexer.TokenType;
 
 /**
  * A leaf node that holds a single token.
@@ -52,18 +53,19 @@ public final class TokenNode extends SyntaxNode {
 
         // Otherwise interpret as a literal at runtime
         String v = tok.getValue();
+        TokenType type = tok.getType();
 
-        if ("true".equals(v))  return Boolean.TRUE;
-        if ("false".equals(v)) return Boolean.FALSE;
+        if (type == TokenType.TRUE)  return Boolean.TRUE;
+        if (type == TokenType.FALSE) return Boolean.FALSE;
 
         // integer literal
-        if (v.matches("[0-9]+")) {
+        if (type == TokenType.INT) {
             try { return Integer.parseInt(v); }
             catch (NumberFormatException e) { /* fall through to real */ }
         }
 
         // real literal
-        if (v.matches("([0-9]+\\.[0-9]+)([eE][+-]?[0-9]+)?")) {
+        if (type == TokenType.REAL) {
             try { return Double.parseDouble(v); }
             catch (NumberFormatException e) { /* fall through */ }
         }
@@ -80,17 +82,17 @@ public final class TokenNode extends SyntaxNode {
         if (t != null) return t;
 
         // Otherwise treat as a literal and return its concrete type
-        String v = tok.getValue();
+        TokenType type = tok.getType();
 
-        if ("true".equals(v) || "false".equals(v)) {
+        if (type == TokenType.TRUE || type == TokenType.FALSE) {
             return new BoolType();
         }
 
-        if (v.matches("[0-9]+")) {
+        if (type == TokenType.INT) {
             return new IntType();
         }
 
-        if (v.matches("([0-9]+\\.[0-9]+)([eE][+-]?[0-9]+)?")) {
+        if (type == TokenType.REAL) {
             return new RealType();
         }
 

@@ -120,7 +120,7 @@ public class MFLParser extends Parser {
     LinkedList<SyntaxNode> exprs = new LinkedList<>();
 
     trace("Enter <prog>");
-    while (!checkMatch(TokenType.EOF)) {
+    while (!tokenIs(TokenType.EOF)) {  // peek; do not consume EOF here
       SyntaxNode currNode = evalValues();
       if (currNode == null)
         break;
@@ -325,7 +325,7 @@ public class MFLParser extends Parser {
             if (!tokenIs(TokenType.RBRACKET)) {
                 elems.add(getGoodParse(evalExpr()));
                 // allow multiple expressions without commas
-                while (!tokenIs(TokenType.RBRACKET)) {
+                while (checkMatch(TokenType.COMMA)) {
                     elems.add(getGoodParse(evalExpr()));
                 }
             }
