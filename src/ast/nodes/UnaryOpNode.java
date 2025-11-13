@@ -66,7 +66,9 @@ public final class UnaryOpNode extends SyntaxNode {
             throw new EvaluationException();
         }
     }
-
+    /**
+     * Performs type inference for the unary operation.
+     */
     @Override
     public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException {
         Type t = expr.typeOf(tenv, inferencer);
