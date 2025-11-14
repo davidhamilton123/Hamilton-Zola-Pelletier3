@@ -59,7 +59,13 @@ public final class LetNode extends SyntaxNode {
             }
         }
     }
-
+    /**
+     * Type checking:
+     *  - type the bound expression,
+     *  - extend the type environment by shadowing the name for the body,
+     *  - type the body,
+     *  - restore the prior binding (or clear by setting null if none existed).
+     */
     @Override
     public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException {
         Type boundType = bound.typeOf(tenv, inferencer);

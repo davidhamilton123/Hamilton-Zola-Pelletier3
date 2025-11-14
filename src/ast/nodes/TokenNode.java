@@ -74,6 +74,11 @@ public final class TokenNode extends SyntaxNode {
         logError(tok.getValue() + " is not defined.");
         throw new EvaluationException();
     }
+    /**
+     * Type checking:
+     * If identifier, look up in type environment.
+     * If literal, return its concrete type.
+     */
 
     @Override
     public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException {

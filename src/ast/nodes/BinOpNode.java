@@ -147,7 +147,9 @@ public final class BinOpNode extends SyntaxNode {
 
         return result;
     }
-
+    /**
+     * Performs type inference for the binary operation.
+     */
     @Override
     public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException {
         Type lt = leftTerm.typeOf(tenv, inferencer);

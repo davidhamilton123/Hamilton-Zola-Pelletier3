@@ -104,7 +104,9 @@ public final class RelOpNode extends SyntaxNode {
     private static double toDouble(Object v) {
         return (v instanceof Integer) ? ((Integer) v).doubleValue() : (Double) v;
     }
-
+    /**
+     * Performs type inference for the relational operation.
+     */
     @Override
     public Type typeOf(TypeEnvironment tenv, Inferencer inferencer) throws TypeException {
         Type lt = leftTerm.typeOf(tenv, inferencer);
